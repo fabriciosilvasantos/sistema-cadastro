@@ -56,7 +56,7 @@ require_once 'includes/header.php';
     <div class="form-container">
         <div class="card">
             <div class="card-body">
-                <h2 class="text-center mb-4">Dashboard</h2>
+                <h2 class="text-center mb-4">Sistema de Controle de Usuários</h2>
 
                 <?php if (isset($mensagem)): ?>
                     <div class="alert alert-<?php echo $tipo_mensagem; ?>">

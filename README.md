@@ -1,4 +1,4 @@
-# Sistema de Cadastro de Usuários
+# Sistema de Controle de Usuários
 
 Sistema web desenvolvido em PHP para cadastro e gerenciamento de usuários, com dashboard e relatórios.
 
@@ -28,7 +28,7 @@ Sistema web desenvolvido em PHP para cadastro e gerenciamento de usuários, com 
 
 1. Clone o repositório:
 ```bash
-git clone https://github.com/fabriciosilvasantos/sistema-cadastro.git
+git clone https://github.com/fabriciosilvasantos/sistema-controle-usuarios.git
 ```
 
 2. Configure seu servidor web para apontar para o diretório do projeto
@@ -81,4 +81,4 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para ma
 
 Fabricio Silva Santos - fabricio.silvasantos@gmail.com
 
-Link do Projeto: [https://github.com/fabriciosilvasantos/sistema-cadastro](https://github.com/fabriciosilvasantos/sistema-cadastro) 
+Link do Projeto: [https://github.com/fabriciosilvasantos/sistema-controle-usuarios](https://github.com/fabriciosilvasantos/sistema-controle-usuarios) 
