@@ -10,24 +10,16 @@ if (!isset($_SESSION['usuario_id'])) {
     exit;
 }
 
-// Verificar se tem permissão para cadastrar usuários
-if (!temPermissao('cadastrar_usuarios')) {
-    header('Location: index.php');
-    exit;
-}
-
-// Definir página atual para o menu
-$current_page = 'cadastro.php';
-
 $mensagem = '';
 $tipo_mensagem = '';
 
-// Buscar níveis de acesso
+// Buscar dados do usuário
 try {
-    $stmt = $pdo->query("SELECT * FROM niveis_acesso ORDER BY nome");
-    $niveis_acesso = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $stmt = $pdo->prepare("SELECT * FROM usuarios WHERE id = ?");
+    $stmt->execute([$_SESSION['usuario_id']]);
+    $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
 } catch(PDOException $e) {
-    $mensagem = "Erro ao buscar níveis de acesso: " . $e->getMessage();
+    $mensagem = "Erro ao buscar dados: " . $e->getMessage();
     $tipo_mensagem = "danger";
 }
 
@@ -35,37 +27,63 @@ try {
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $nome = $_POST['nome'] ?? '';
     $email = $_POST['email'] ?? '';
-    $senha = $_POST['senha'] ?? '';
-    $confirmar_senha = $_POST['confirmar_senha'] ?? '';
     $telefone = $_POST['telefone'] ?? '';
-    $nivel_acesso_id = $_POST['nivel_acesso_id'] ?? '';
+    $senha_atual = $_POST['senha_atual'] ?? '';
+    $nova_senha = $_POST['nova_senha'] ?? '';
+    $confirmar_senha = $_POST['confirmar_senha'] ?? '';
     
     try {
-        // Verificar se o email já existe
-        $stmt = $pdo->prepare("SELECT id FROM usuarios WHERE email = ?");
-        $stmt->execute([$email]);
+        // Verificar se o email já existe para outro usuário
+        $stmt = $pdo->prepare("SELECT id FROM usuarios WHERE email = ? AND id != ?");
+        $stmt->execute([$email, $_SESSION['usuario_id']]);
         if ($stmt->fetch()) {
-            $mensagem = "Este email já está cadastrado.";
+            $mensagem = "Este email já está em uso por outro usuário.";
             $tipo_mensagem = "danger";
         } else {
-            if ($senha === $confirmar_senha && strlen($senha) >= 6) {
-                // Inserir novo usuário
-                $stmt = $pdo->prepare("
-                    INSERT INTO usuarios (nome, email, senha, telefone, nivel_acesso_id, status) 
-                    VALUES (?, ?, ?, ?, ?, 'ativo')
-                ");
-                $senha_hash = password_hash($senha, PASSWORD_DEFAULT);
-                $stmt->execute([$nome, $email, $senha_hash, $telefone, $nivel_acesso_id]);
-                
-                $mensagem = "Usuário cadastrado com sucesso!";
-                $tipo_mensagem = "success";
+            // Se tentou alterar a senha
+            if (!empty($senha_atual)) {
+                if (password_verify($senha_atual, $usuario['senha'])) {
+                    if ($nova_senha === $confirmar_senha && strlen($nova_senha) >= 6) {
+                        // Atualizar dados e senha
+                        $stmt = $pdo->prepare("
+                            UPDATE usuarios 
+                            SET nome = ?, email = ?, telefone = ?, senha = ? 
+                            WHERE id = ?
+                        ");
+                        $nova_senha_hash = password_hash($nova_senha, PASSWORD_DEFAULT);
+                        $stmt->execute([$nome, $email, $telefone, $nova_senha_hash, $_SESSION['usuario_id']]);
+                        
+                        $mensagem = "Dados e senha atualizados com sucesso!";
+                        $tipo_mensagem = "success";
+                        
+                        // Atualizar dados da sessão
+                        $_SESSION['usuario_nome'] = $nome;
+                    } else {
+                        $mensagem = "As senhas não conferem ou são muito curtas.";
+                        $tipo_mensagem = "danger";
+                    }
+                } else {
+                    $mensagem = "Senha atual incorreta.";
+                    $tipo_mensagem = "danger";
+                }
             } else {
-                $mensagem = "As senhas não conferem ou são muito curtas.";
-                $tipo_mensagem = "danger";
+                // Atualizar apenas dados pessoais
+                $stmt = $pdo->prepare("
+                    UPDATE usuarios 
+                    SET nome = ?, email = ?, telefone = ? 
+                    WHERE id = ?
+                ");
+                $stmt->execute([$nome, $email, $telefone, $_SESSION['usuario_id']]);
+                
+                $mensagem = "Dados atualizados com sucesso!";
+                $tipo_mensagem = "success";
+                
+                // Atualizar dados da sessão
+                $_SESSION['usuario_nome'] = $nome;
             }
         }
     } catch(PDOException $e) {
-        $mensagem = "Erro ao cadastrar usuário: " . $e->getMessage();
+        $mensagem = "Erro ao atualizar dados: " . $e->getMessage();
         $tipo_mensagem = "danger";
     }
 }
@@ -78,7 +96,7 @@ require_once 'includes/header.php';
         <div class="col-md-8 col-lg-6">
             <div class="card mt-5">
                 <div class="card-body">
-                    <h2 class="text-center mb-4">Cadastrar Novo Usuário</h2>
+                    <h2 class="text-center mb-4">Meu Perfil</h2>
 
                     <?php if ($mensagem): ?>
                         <div class="alert alert-<?php echo $tipo_mensagem; ?>">
@@ -94,9 +112,9 @@ require_once 'includes/header.php';
                                    id="nome" 
                                    name="nome" 
                                    required 
-                                   value="<?php echo $_POST['nome'] ?? ''; ?>">
+                                   value="<?php echo $usuario['nome']; ?>">
                             <div class="invalid-feedback">
-                                Por favor, insira o nome completo.
+                                Por favor, insira seu nome completo.
                             </div>
                         </div>
 
@@ -107,7 +125,7 @@ require_once 'includes/header.php';
                                    id="email" 
                                    name="email" 
                                    required 
-                                   value="<?php echo $_POST['email'] ?? ''; ?>">
+                                   value="<?php echo $usuario['email']; ?>">
                             <div class="invalid-feedback">
                                 Por favor, insira um email válido.
                             </div>
@@ -119,32 +137,29 @@ require_once 'includes/header.php';
                                    class="form-control" 
                                    id="telefone" 
                                    name="telefone" 
-                                   value="<?php echo $_POST['telefone'] ?? ''; ?>">
+                                   value="<?php echo $usuario['telefone']; ?>">
                         </div>
 
+                        <hr>
+
+                        <h5 class="mb-3">Alterar Senha</h5>
                         <div class="mb-3">
-                            <label for="nivel_acesso_id" class="form-label">Nível de Acesso</label>
-                            <select class="form-select" id="nivel_acesso_id" name="nivel_acesso_id" required>
-                                <option value="">Selecione um nível de acesso</option>
-                                <?php foreach ($niveis_acesso as $nivel): ?>
-                                    <option value="<?php echo $nivel['id']; ?>" 
-                                            <?php echo isset($_POST['nivel_acesso_id']) && $_POST['nivel_acesso_id'] == $nivel['id'] ? 'selected' : ''; ?>>
-                                        <?php echo $nivel['nome']; ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                            <div class="invalid-feedback">
-                                Por favor, selecione um nível de acesso.
+                            <label for="senha_atual" class="form-label">Senha Atual</label>
+                            <input type="password" 
+                                   class="form-control" 
+                                   id="senha_atual" 
+                                   name="senha_atual">
+                            <div class="form-text">
+                                Preencha apenas se desejar alterar sua senha.
                             </div>
                         </div>
 
                         <div class="mb-3">
-                            <label for="senha" class="form-label">Senha</label>
+                            <label for="nova_senha" class="form-label">Nova Senha</label>
                             <input type="password" 
                                    class="form-control" 
-                                   id="senha" 
-                                   name="senha" 
-                                   required
+                                   id="nova_senha" 
+                                   name="nova_senha"
                                    minlength="6"
                                    maxlength="20"
                                    pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{6,}"
@@ -155,12 +170,11 @@ require_once 'includes/header.php';
                         </div>
 
                         <div class="mb-3">
-                            <label for="confirmar_senha" class="form-label">Confirmar Senha</label>
+                            <label for="confirmar_senha" class="form-label">Confirmar Nova Senha</label>
                             <input type="password" 
                                    class="form-control" 
                                    id="confirmar_senha" 
-                                   name="confirmar_senha" 
-                                   required
+                                   name="confirmar_senha"
                                    minlength="6"
                                    maxlength="20">
                             <div class="invalid-feedback">
@@ -170,9 +184,9 @@ require_once 'includes/header.php';
 
                         <div class="d-grid gap-2">
                             <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-person-plus"></i> Cadastrar Usuário
+                                <i class="bi bi-check-lg"></i> Salvar Alterações
                             </button>
-                            <a href="usuarios.php" class="btn btn-secondary">
+                            <a href="index.php" class="btn btn-secondary">
                                 <i class="bi bi-arrow-left"></i> Voltar
                             </a>
                         </div>
@@ -201,7 +215,7 @@ require_once 'includes/header.php';
 
 // Validação de senha
 document.getElementById('confirmar_senha').addEventListener('input', function() {
-    var senha = document.getElementById('senha').value;
+    var senha = document.getElementById('nova_senha').value;
     var confirmarSenha = this.value;
     var feedback = this.nextElementSibling;
     
